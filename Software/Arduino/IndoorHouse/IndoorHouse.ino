@@ -10,12 +10,25 @@
 #include <WiFiUdp.h>
 #include <TimeLib.h>
 
+#include <Adafruit_Sensor.h>
+#include <DHT.h>
+#include <DHT_U.h>
+
 #define OLED_RESET 0
 Adafruit_SSD1306_WEMOS display1(OLED_RESET);
 Adafruit_SSD1306_WEMOS display2(OLED_RESET);
 
 const int address1 = 0x3C;
 const int address2 = 0x3D;
+
+#define DHTPIN D4      // Digital pin connected to the DHT sensor
+#define DHTTYPE DHT11  // DHT 11
+
+
+DHT_Unified dht(DHTPIN, DHTTYPE);
+
+uint32_t delayMS;
+uint32_t lastDHTCheck;
 
 
 WiFiClient client;
@@ -62,6 +75,51 @@ void setup() {
   display2.setTextColor(WHITE);
   display2.clearDisplay();
 
+  // Temp and Humidity Sensor init
+  dht.begin();
+  Serial.println(F("DHTxx Unified Sensor Example"));
+  // Print temperature sensor details.
+  sensor_t sensor;
+  dht.temperature().getSensor(&sensor);
+  Serial.println(F("------------------------------------"));
+  Serial.println(F("Temperature Sensor"));
+  Serial.print(F("Sensor Type: "));
+  Serial.println(sensor.name);
+  Serial.print(F("Driver Ver:  "));
+  Serial.println(sensor.version);
+  Serial.print(F("Unique ID:   "));
+  Serial.println(sensor.sensor_id);
+  Serial.print(F("Max Value:   "));
+  Serial.print(sensor.max_value);
+  Serial.println(F("°C"));
+  Serial.print(F("Min Value:   "));
+  Serial.print(sensor.min_value);
+  Serial.println(F("°C"));
+  Serial.print(F("Resolution:  "));
+  Serial.print(sensor.resolution);
+  Serial.println(F("°C"));
+  Serial.println(F("------------------------------------"));
+  // Print humidity sensor details.
+  dht.humidity().getSensor(&sensor);
+  Serial.println(F("Humidity Sensor"));
+  Serial.print(F("Sensor Type: "));
+  Serial.println(sensor.name);
+  Serial.print(F("Driver Ver:  "));
+  Serial.println(sensor.version);
+  Serial.print(F("Unique ID:   "));
+  Serial.println(sensor.sensor_id);
+  Serial.print(F("Max Value:   "));
+  Serial.print(sensor.max_value);
+  Serial.println(F("%"));
+  Serial.print(F("Min Value:   "));
+  Serial.print(sensor.min_value);
+  Serial.println(F("%"));
+  Serial.print(F("Resolution:  "));
+  Serial.print(sensor.resolution);
+  Serial.println(F("%"));
+  Serial.println(F("------------------------------------"));
+  // Set delay between sensor readings based on sensor details.
+  delayMS = sensor.min_delay / 1000;
 
   WiFiManager wifiManager;
   wifiManager.setWiFiAutoReconnect(true);
@@ -111,7 +169,40 @@ time_t prevDisplay = 0;  // when the digital clock was displayed
 
 
 void loop() {
+  if (millis() - delayMS > lastDHTCheck) {
+    display2.clearDisplay();
+    sensors_event_t event;
+    dht.temperature().getEvent(&event);
+    display2.setCursor(0, 5);
+    if (isnan(event.temperature)) {
+      //Serial.println(F("Error reading temperature!"));
+      display2.println(F("Tmp Err"));
+    } else {
+      // Serial.print(F("Temperature: "));
+      // Serial.print(event.temperature);
+      // Serial.println(F("°C"));
+      display2.print(F("Tmp: "));
+      display2.print(event.temperature);
+      // display2.println(F("°C"));
+    }
+    // Get humidity event and print its value.
+    dht.humidity().getEvent(&event);
+    display2.setCursor(0, 15);
 
+    if (isnan(event.relative_humidity)) {
+      //Serial.println(F("Error reading humidity!"));
+      display2.println(F("Hum Err"));
+    } else {
+      // Serial.print(F("Humidity: "));
+      // Serial.print(event.relative_humidity);
+      // Serial.println(F("%"));
+      display2.print(F("Hum: "));
+      display2.print(event.relative_humidity);
+      //  display2.println(F("%"));
+    }
+    display2.display();
+    lastDHTCheck = millis();
+  }
 
 
   if (timeStatus() != timeNotSet) {
@@ -139,6 +230,7 @@ void loop() {
 
     switchFlag = false;
   }
+  /*
 
   if (clkFlag) {
     display2.clearDisplay();
@@ -148,6 +240,7 @@ void loop() {
     display2.display();
     clkFlag = false;
   }
+  */
 }
 
 
