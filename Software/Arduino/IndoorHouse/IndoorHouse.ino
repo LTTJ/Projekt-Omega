@@ -1,18 +1,28 @@
+#include "secrets.h"
+
+// OLED
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306_WEMOS.h>
 
+// MQTT
+#include <ArduinoMqttClient.h>
+
+// WIFI
 #include <ESP8266WiFi.h>  //https://github.com/esp8266/Arduino
 #include <WiFiManager.h>
 
+// CLOCK
 #include "Clock.h"
 #include <WiFiUdp.h>
 #include <TimeLib.h>
 
+// DHT
 #include <Adafruit_Sensor.h>
 #include <DHT.h>
 #include <DHT_U.h>
+
 
 #define OLED_RESET 0
 Adafruit_SSD1306_WEMOS display1(OLED_RESET);
@@ -33,6 +43,7 @@ uint32_t lastDHTCheck;
 
 WiFiClient client;
 WiFiUDP Udp;
+MqttClient mqttClient(client);
 
 Clock c;
 
@@ -132,6 +143,25 @@ void setup() {
   display1.clearDisplay();
   display1.println("connected!");
   display1.display();
+
+  mqttClient.setId("IndoorHouse");
+  mqttClient.setUsernamePassword(username, password);
+
+  // String willPayload = "oh no!";
+  // bool willRetain = true;
+  // int willQos = 1;
+
+  // mqttClient.beginWill(willTopic, willPayload.length(), willRetain, willQos);
+  // mqttClient.print(willPayload);
+  // mqttClient.endWill();
+
+
+  if (!mqttClient.connect(broker, port)) {
+    Serial.print("MQTT connection failed! Error code = ");
+    Serial.println(mqttClient.connectError());
+    while (1)
+      ;
+  }
 
   Udp.begin(localPort);
   setSyncProvider(getNtpTime);
