@@ -1,5 +1,5 @@
 #include "secrets.h"
-
+#include "Definitions.h"
 // OLED
 #include <SPI.h>
 #include <Wire.h>
@@ -23,16 +23,24 @@
 #include <DHT.h>
 #include <DHT_U.h>
 
+// https://forum.arduino.cc/t/single-line-define-to-disable-code/636044/2
+#define DEBUG true
+#define DEBUG_SERIAL \
+  if (DEBUG) Serial
 
-#define OLED_RESET 0
+#define DEBUG_DHT false
+#define DEBUG_DHT_SERIAL \
+  if (DEBUG_DHT) Serial
+
+#define DEBUG_MQTT false
+#define DEBUG_MQTT_SERIAL \
+  if (DEBUG_MQTT) Serial
+
+
 Adafruit_SSD1306_WEMOS display1(OLED_RESET);
 Adafruit_SSD1306_WEMOS display2(OLED_RESET);
 
-const int address1 = 0x3C;
-const int address2 = 0x3D;
-
-#define DHTPIN D4      // Digital pin connected to the DHT sensor
-#define DHTTYPE DHT11  // DHT 11
+uint8_t displayMode = 0;
 
 
 DHT_Unified dht(DHTPIN, DHTTYPE);
@@ -47,34 +55,59 @@ MqttClient mqttClient(client);
 
 Clock c;
 
-const static char ntpServerName[] = "de.pool.ntp.org";
-const static int timeZone = 2;
-
-const static unsigned int localPort = 8888;
-
-
 volatile bool switchFlag = false;
-const int SWITCHPIN = D5;
 
-const int CLK = D7;
-const int DT = D3;
-const int SW = D6;
+ICACHE_RAM_ATTR void SWITCHHandler(void) {
+  switchFlag = true;
+}
+
 
 volatile int count = 0;
 volatile int lastCLK = 0;
-volatile bool clkFlag = false;
+
+volatile bool countChanged = false;
+
+time_t prevDisplay = 0;  // when the digital clock was displayed
+float outdoorTempPrev = 0;
+float outdoorTemp = 0;
+float outdoorHumidPrev = 0;
+float outdoorHumid = 0;
+
+
+//The interrupt handlers
+ICACHE_RAM_ATTR void ClockChanged(void) {
+  int clkValue = digitalRead(CLK);  //Read the CLK pin level
+  int dtValue = digitalRead(DT);    //Read the DT pin level
+  if (lastCLK != clkValue) {
+    lastCLK = clkValue;
+    count += (clkValue != dtValue ? 1 : -1);  //CLK and inconsistent DT + 1, otherwise - 1
+  }
+  countChanged = true;
+}
+
+ICACHE_RAM_ATTR void SWChanged(void) {
+  displayMode++;
+  displayMode %= MODE_COUNT;
+  countChanged = true;
+  outdoorTempPrev = 256;
+  outdoorHumidPrev = 256;
+}
+
 
 void setup() {
+#if DEBUG_DHT == true || DEBUG == true || DEBUG_MQTT == true
   Serial.begin(115200);
+#endif
 
-  pinMode(SWITCHPIN, INPUT);
+  pinMode(SWITCHPIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(SWITCHPIN), SWITCHHandler, CHANGE);
 
-  pinMode(SW, INPUT);
-  pinMode(CLK, INPUT);
+  pinMode(SW, INPUT_PULLUP);
+  //digitalWrite(SW, HIGH);
+  pinMode(CLK, INPUT_PULLUP);
   pinMode(DT, INPUT);
-  attachInterrupt(digitalPinToInterrupt(CLK), CLKHandler, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(SW), SWHandler, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(CLK), ClockChanged, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(SW), SWChanged, FALLING);
 
 
   display1.begin(SSD1306_SWITCHCAPVCC, address1);
@@ -88,58 +121,58 @@ void setup() {
 
   // Temp and Humidity Sensor init
   dht.begin();
-  Serial.println(F("DHTxx Unified Sensor Example"));
+  DEBUG_SERIAL.println(F("DHTxx Unified Sensor Example"));
   // Print temperature sensor details.
   sensor_t sensor;
   dht.temperature().getSensor(&sensor);
-  Serial.println(F("------------------------------------"));
-  Serial.println(F("Temperature Sensor"));
-  Serial.print(F("Sensor Type: "));
-  Serial.println(sensor.name);
-  Serial.print(F("Driver Ver:  "));
-  Serial.println(sensor.version);
-  Serial.print(F("Unique ID:   "));
-  Serial.println(sensor.sensor_id);
-  Serial.print(F("Max Value:   "));
-  Serial.print(sensor.max_value);
-  Serial.println(F("°C"));
-  Serial.print(F("Min Value:   "));
-  Serial.print(sensor.min_value);
-  Serial.println(F("°C"));
-  Serial.print(F("Resolution:  "));
-  Serial.print(sensor.resolution);
-  Serial.println(F("°C"));
-  Serial.println(F("------------------------------------"));
+  DEBUG_DHT_SERIAL.println(F("------------------------------------"));
+  DEBUG_DHT_SERIAL.println(F("Temperature Sensor"));
+  DEBUG_DHT_SERIAL.print(F("Sensor Type: "));
+  DEBUG_DHT_SERIAL.println(sensor.name);
+  DEBUG_DHT_SERIAL.print(F("Driver Ver:  "));
+  DEBUG_DHT_SERIAL.println(sensor.version);
+  DEBUG_DHT_SERIAL.print(F("Unique ID:   "));
+  DEBUG_DHT_SERIAL.println(sensor.sensor_id);
+  DEBUG_DHT_SERIAL.print(F("Max Value:   "));
+  DEBUG_DHT_SERIAL.print(sensor.max_value);
+  DEBUG_DHT_SERIAL.println(F("°C"));
+  DEBUG_DHT_SERIAL.print(F("Min Value:   "));
+  DEBUG_DHT_SERIAL.print(sensor.min_value);
+  DEBUG_DHT_SERIAL.println(F("°C"));
+  DEBUG_DHT_SERIAL.print(F("Resolution:  "));
+  DEBUG_DHT_SERIAL.print(sensor.resolution);
+  DEBUG_DHT_SERIAL.println(F("°C"));
+  DEBUG_DHT_SERIAL.println(F("------------------------------------"));
   // Print humidity sensor details.
   dht.humidity().getSensor(&sensor);
-  Serial.println(F("Humidity Sensor"));
-  Serial.print(F("Sensor Type: "));
-  Serial.println(sensor.name);
-  Serial.print(F("Driver Ver:  "));
-  Serial.println(sensor.version);
-  Serial.print(F("Unique ID:   "));
-  Serial.println(sensor.sensor_id);
-  Serial.print(F("Max Value:   "));
-  Serial.print(sensor.max_value);
-  Serial.println(F("%"));
-  Serial.print(F("Min Value:   "));
-  Serial.print(sensor.min_value);
-  Serial.println(F("%"));
-  Serial.print(F("Resolution:  "));
-  Serial.print(sensor.resolution);
-  Serial.println(F("%"));
-  Serial.println(F("------------------------------------"));
+  DEBUG_DHT_SERIAL.println(F("Humidity Sensor"));
+  DEBUG_DHT_SERIAL.print(F("Sensor Type: "));
+  DEBUG_DHT_SERIAL.println(sensor.name);
+  DEBUG_DHT_SERIAL.print(F("Driver Ver:  "));
+  DEBUG_DHT_SERIAL.println(sensor.version);
+  DEBUG_DHT_SERIAL.print(F("Unique ID:   "));
+  DEBUG_DHT_SERIAL.println(sensor.sensor_id);
+  DEBUG_DHT_SERIAL.print(F("Max Value:   "));
+  DEBUG_DHT_SERIAL.print(sensor.max_value);
+  DEBUG_DHT_SERIAL.println(F("%"));
+  DEBUG_DHT_SERIAL.print(F("Min Value:   "));
+  DEBUG_DHT_SERIAL.print(sensor.min_value);
+  DEBUG_DHT_SERIAL.println(F("%"));
+  DEBUG_DHT_SERIAL.print(F("Resolution:  "));
+  DEBUG_DHT_SERIAL.print(sensor.resolution);
+  DEBUG_DHT_SERIAL.println(F("%"));
+  DEBUG_DHT_SERIAL.println(F("------------------------------------"));
   // Set delay between sensor readings based on sensor details.
   delayMS = sensor.min_delay / 1000;
 
   WiFiManager wifiManager;
   wifiManager.setWiFiAutoReconnect(true);
-  Serial.println("starting connection");
+  DEBUG_SERIAL.println("starting connection");
   display1.clearDisplay();
   display1.println("connecting...");
   display1.display();
-  wifiManager.autoConnect("MQTTWifiManager");
-  Serial.println("connected...yeey :)");
+  wifiManager.autoConnect("IndoorHouse");
+  DEBUG_SERIAL.println("connected...yeey :)");
   display1.clearDisplay();
   display1.println("connected!");
   display1.display();
@@ -157,11 +190,15 @@ void setup() {
 
 
   if (!mqttClient.connect(broker, port)) {
-    Serial.print("MQTT connection failed! Error code = ");
-    Serial.println(mqttClient.connectError());
+    DEBUG_MQTT_SERIAL.print("MQTT connection failed! Error code = ");
+    DEBUG_MQTT_SERIAL.println(mqttClient.connectError());
     while (1)
       ;
   }
+  mqttClient.subscribe(OUTDOOR_TEMP_TOPIC);
+  mqttClient.subscribe(OUTDOOR_HUMID_TOPIC);
+
+
 
   Udp.begin(localPort);
   setSyncProvider(getNtpTime);
@@ -195,57 +232,124 @@ void setup() {
   display2.display();  
  */
 
-time_t prevDisplay = 0;  // when the digital clock was displayed
-
 
 void loop() {
-  if (millis() - delayMS > lastDHTCheck) {
-    display2.clearDisplay();
-    sensors_event_t event;
-    dht.temperature().getEvent(&event);
-    display2.setCursor(0, 5);
-    if (isnan(event.temperature)) {
-      //Serial.println(F("Error reading temperature!"));
-      display2.println(F("Tmp Err"));
-    } else {
-      // Serial.print(F("Temperature: "));
-      // Serial.print(event.temperature);
-      // Serial.println(F("°C"));
-      display2.print(F("Tmp: "));
-      display2.print(event.temperature);
-      // display2.println(F("°C"));
-    }
-    // Get humidity event and print its value.
-    dht.humidity().getEvent(&event);
-    display2.setCursor(0, 15);
 
-    if (isnan(event.relative_humidity)) {
-      //Serial.println(F("Error reading humidity!"));
-      display2.println(F("Hum Err"));
-    } else {
-      // Serial.print(F("Humidity: "));
-      // Serial.print(event.relative_humidity);
-      // Serial.println(F("%"));
-      display2.print(F("Hum: "));
-      display2.print(event.relative_humidity);
-      //  display2.println(F("%"));
+  int messageSize = mqttClient.parseMessage();
+  if (messageSize) {
+    // we received a message, print out the topic and contents
+    String topic = mqttClient.messageTopic();
+    DEBUG_MQTT_SERIAL.print("Received a message with topic '");
+    DEBUG_MQTT_SERIAL.print(topic);
+    DEBUG_MQTT_SERIAL.print("', length ");
+    DEBUG_MQTT_SERIAL.print(messageSize);
+    DEBUG_MQTT_SERIAL.println(" bytes:");
+
+    // use the Stream interface to print the contents
+    String value = "";
+    while (mqttClient.available()) {
+      value += (char)mqttClient.read();
     }
-    display2.display();
-    lastDHTCheck = millis();
+    DEBUG_MQTT_SERIAL.println(value);
+    DEBUG_MQTT_SERIAL.println();
+
+    if (topic.equals(OUTDOOR_TEMP_TOPIC)) {
+      outdoorTempPrev = outdoorTemp;
+      outdoorTemp = value.toFloat();
+    } else if (topic.equals(OUTDOOR_HUMID_TOPIC)) {
+      outdoorHumidPrev = outdoorHumid;
+      outdoorHumid = value.toFloat();
+    }
+  }
+
+
+
+  switch (displayMode) {
+    case INDOOR_DATA_MODE:
+      if (millis() - delayMS > lastDHTCheck) {
+        display2.clearDisplay();
+        sensors_event_t event;
+        dht.temperature().getEvent(&event);
+        display2.setCursor(0, 5);
+        display2.print("Indoor");
+        display2.setCursor(0, 15);
+
+        if (isnan(event.temperature)) {
+          DEBUG_DHT_SERIAL.println(F("Error reading temperature!"));
+          display2.println(F("Tmp Err"));
+        } else {
+          DEBUG_DHT_SERIAL.print(F("Temperature: "));
+          DEBUG_DHT_SERIAL.print(event.temperature);
+          DEBUG_DHT_SERIAL.println(F("°C"));
+          display2.print(F("Tmp: "));
+          display2.print(event.temperature);
+          // display2.println(F("°C"));
+        }
+        // Get humidity event and print its value.
+        dht.humidity().getEvent(&event);
+        display2.setCursor(0, 25);
+
+        if (isnan(event.relative_humidity)) {
+          DEBUG_DHT_SERIAL.println(F("Error reading humidity!"));
+          display2.println(F("Hum Err"));
+        } else {
+          DEBUG_DHT_SERIAL.print(F("Humidity: "));
+          DEBUG_DHT_SERIAL.print(event.relative_humidity);
+          DEBUG_DHT_SERIAL.println(F("%"));
+          display2.print(F("Hum: "));
+          display2.print(event.relative_humidity);
+          //  display2.println(F("%"));
+        }
+        display2.display();
+        lastDHTCheck = millis();
+      }
+      break;
+    case OUTDOOR_DATA_MODE:
+      if (outdoorTempPrev != outdoorTemp) {
+
+        display2.clearDisplay();
+        display2.setCursor(0, 5);
+        display2.print("Outdoor");
+        display2.setCursor(0, 15);
+        display2.print(F("Tmp: "));
+        display2.print(outdoorTemp);
+        // display2.println(F("°C"));
+
+        display2.setCursor(0, 25);
+
+        display2.print(F("Hum: "));
+        display2.print(outdoorHumid);
+        //  display2.println(F("%"));
+
+        display2.display();
+        outdoorTempPrev = outdoorTemp;
+        outdoorHumidPrev = outdoorHumid;
+      }
+      break;
+    case COUNTER_MODE:
+      if (countChanged) {
+        display2.clearDisplay();
+        display2.setCursor(0, 5);
+        display2.print(F("Count: "));
+        display2.print(count);
+        display2.display();
+        countChanged = false;
+      }
+
+      break;
+    default:
+      break;
   }
 
 
   if (timeStatus() != timeNotSet) {
     if (now() != prevDisplay) {  //update the display only if time has changed
       prevDisplay = now();
-
-
       display1.clearDisplay();
       c.displayAnalog(&display1, hour(), minute(), second());
       display1.display();
     }
   }
-
   if (switchFlag) {
 
     display1.clearDisplay();
@@ -260,48 +364,9 @@ void loop() {
 
     switchFlag = false;
   }
-  /*
-
-  if (clkFlag) {
-    display2.clearDisplay();
-    display2.setCursor(0, 10);
-    display2.print(F("count: "));
-    display2.print(count);
-    display2.display();
-    clkFlag = false;
-  }
-  */
-}
-
-
-
-ICACHE_RAM_ATTR void SWITCHHandler(void) {
-  switchFlag = true;
-}
-
-ICACHE_RAM_ATTR void CLKHandler(void) {
-  int clkValue = digitalRead(CLK);  //Read the CLK pin level
-  int dtValue = digitalRead(DT);    //Read the DT pin level
-  if (lastCLK != clkValue) {
-    lastCLK = clkValue;
-    count += (clkValue != dtValue ? 1 : -1);  //CLK and inconsistent DT + 1, otherwise - 1
-  }
-  Serial.println("Encoder");
-  Serial.print("count: ");
-  Serial.println(count);
-  clkFlag = true;
-}
-
-
-ICACHE_RAM_ATTR void SWHandler(void) {
-  if (count != 0) {
-    count = 0;
-  }
-  Serial.println("EncoderBtn");
 }
 
 // NTP STUFF
-
 
 const static int NTP_PACKET_SIZE = 48;
 static byte packetBuffer[NTP_PACKET_SIZE];
@@ -311,18 +376,18 @@ time_t getNtpTime() {
 
   while (Udp.parsePacket() > 0)
     ;  // discard any previously received packets
-  Serial.println("Transmit NTP Request");
+  DEBUG_SERIAL.println("Transmit NTP Request");
   // get a random server from the pool
   WiFi.hostByName(ntpServerName, ntpServerIP);
-  Serial.print(ntpServerName);
-  Serial.print(": ");
-  Serial.println(ntpServerIP);
+  DEBUG_SERIAL.print(ntpServerName);
+  DEBUG_SERIAL.print(": ");
+  DEBUG_SERIAL.println(ntpServerIP);
   sendNTPpacket(ntpServerIP);
   uint32_t beginWait = millis();
   while (millis() - beginWait < 1500) {
     int size = Udp.parsePacket();
     if (size >= NTP_PACKET_SIZE) {
-      Serial.println("Receive NTP Response");
+      DEBUG_SERIAL.println("Receive NTP Response");
       Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
       unsigned long secsSince1900;
       // convert four bytes starting at location 40 to a long integer
@@ -333,7 +398,7 @@ time_t getNtpTime() {
       return secsSince1900 - 2208988800UL + timeZone * SECS_PER_HOUR;
     }
   }
-  Serial.println("No NTP Response :-(");
+  DEBUG_SERIAL.println("No NTP Response :-(");
   return 0;  // return 0 if unable to get the time
 }
 
