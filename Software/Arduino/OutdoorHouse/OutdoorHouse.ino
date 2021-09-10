@@ -12,6 +12,18 @@
 #include <DHT.h>
 #include <DHT_U.h>
 
+#define DEBUG true
+#define DEBUG_SERIAL \
+  if (DEBUG) Serial
+
+#define DEBUG_DHT false
+#define DEBUG_DHT_SERIAL \
+  if (DEBUG_DHT) Serial
+
+#define DEBUG_MQTT false
+#define DEBUG_MQTT_SERIAL \
+  if (DEBUG_MQTT) Serial
+
 
 #define DHTPIN D4      // Digital pin connected to the DHT sensor
 #define DHTTYPE DHT11  // DHT 11
@@ -24,8 +36,8 @@ uint32_t lastDHTCheck;
 WiFiClient client;
 MqttClient mqttClient(client);
 
-const char DHT_HUMID_TOPIC[] = "outdoor/dht/humid";
-const char DHT_TEMP_TOPIC[] = "outdoor/dht/temp";
+const char DHT_HUMID_TOPIC[] = "Projekt-Omega/outdoor/dht/humid";
+const char DHT_TEMP_TOPIC[] = "Projekt-Omega/outdoor/dht/temp";
 
 const uint8_t RECORD_COUNT = 10;
 uint8_t tempCount = 0;
@@ -34,59 +46,60 @@ double tempSum = 0;
 double humidSum = 0;
 
 void setup() {
+#if DEBUG_DHT == true || DEBUG == true || DEBUG_MQTT == true
   Serial.begin(115200);
-
+#endif
   // Temp and Humidity Sensor init
   dht.begin();
-  Serial.println(F("DHTxx Unified Sensor Example"));
+  DEBUG_DHT_SERIAL.println(F("DHTxx Unified Sensor Example"));
   // Print temperature sensor details.
   sensor_t sensor;
   dht.temperature().getSensor(&sensor);
-  Serial.println(F("------------------------------------"));
-  Serial.println(F("Temperature Sensor"));
-  Serial.print(F("Sensor Type: "));
-  Serial.println(sensor.name);
-  Serial.print(F("Driver Ver:  "));
-  Serial.println(sensor.version);
-  Serial.print(F("Unique ID:   "));
-  Serial.println(sensor.sensor_id);
-  Serial.print(F("Max Value:   "));
-  Serial.print(sensor.max_value);
-  Serial.println(F("°C"));
-  Serial.print(F("Min Value:   "));
-  Serial.print(sensor.min_value);
-  Serial.println(F("°C"));
-  Serial.print(F("Resolution:  "));
-  Serial.print(sensor.resolution);
-  Serial.println(F("°C"));
-  Serial.println(F("------------------------------------"));
+  DEBUG_DHT_SERIAL.println(F("------------------------------------"));
+  DEBUG_DHT_SERIAL.println(F("Temperature Sensor"));
+  DEBUG_DHT_SERIAL.print(F("Sensor Type: "));
+  DEBUG_DHT_SERIAL.println(sensor.name);
+  DEBUG_DHT_SERIAL.print(F("Driver Ver:  "));
+  DEBUG_DHT_SERIAL.println(sensor.version);
+  DEBUG_DHT_SERIAL.print(F("Unique ID:   "));
+  DEBUG_DHT_SERIAL.println(sensor.sensor_id);
+  DEBUG_DHT_SERIAL.print(F("Max Value:   "));
+  DEBUG_DHT_SERIAL.print(sensor.max_value);
+  DEBUG_DHT_SERIAL.println(F("°C"));
+  DEBUG_DHT_SERIAL.print(F("Min Value:   "));
+  DEBUG_DHT_SERIAL.print(sensor.min_value);
+  DEBUG_DHT_SERIAL.println(F("°C"));
+  DEBUG_DHT_SERIAL.print(F("Resolution:  "));
+  DEBUG_DHT_SERIAL.print(sensor.resolution);
+  DEBUG_DHT_SERIAL.println(F("°C"));
+  DEBUG_DHT_SERIAL.println(F("------------------------------------"));
   // Print humidity sensor details.
   dht.humidity().getSensor(&sensor);
-  Serial.println(F("Humidity Sensor"));
-  Serial.print(F("Sensor Type: "));
-  Serial.println(sensor.name);
-  Serial.print(F("Driver Ver:  "));
-  Serial.println(sensor.version);
-  Serial.print(F("Unique ID:   "));
-  Serial.println(sensor.sensor_id);
-  Serial.print(F("Max Value:   "));
-  Serial.print(sensor.max_value);
-  Serial.println(F("%"));
-  Serial.print(F("Min Value:   "));
-  Serial.print(sensor.min_value);
-  Serial.println(F("%"));
-  Serial.print(F("Resolution:  "));
-  Serial.print(sensor.resolution);
-  Serial.println(F("%"));
-  Serial.println(F("------------------------------------"));
+  DEBUG_DHT_SERIAL.println(F("Humidity Sensor"));
+  DEBUG_DHT_SERIAL.print(F("Sensor Type: "));
+  DEBUG_DHT_SERIAL.println(sensor.name);
+  DEBUG_DHT_SERIAL.print(F("Driver Ver:  "));
+  DEBUG_DHT_SERIAL.println(sensor.version);
+  DEBUG_DHT_SERIAL.print(F("Unique ID:   "));
+  DEBUG_DHT_SERIAL.println(sensor.sensor_id);
+  DEBUG_DHT_SERIAL.print(F("Max Value:   "));
+  DEBUG_DHT_SERIAL.print(sensor.max_value);
+  DEBUG_DHT_SERIAL.println(F("%"));
+  DEBUG_DHT_SERIAL.print(F("Min Value:   "));
+  DEBUG_DHT_SERIAL.print(sensor.min_value);
+  DEBUG_DHT_SERIAL.println(F("%"));
+  DEBUG_DHT_SERIAL.print(F("Resolution:  "));
+  DEBUG_DHT_SERIAL.print(sensor.resolution);
+  DEBUG_DHT_SERIAL.println(F("%"));
+  DEBUG_DHT_SERIAL.println(F("------------------------------------"));
   // Set delay between sensor readings based on sensor details.
   delayMS = sensor.min_delay / 1000;
 
   WiFiManager wifiManager;
   wifiManager.setWiFiAutoReconnect(true);
-  Serial.println("starting connection");
+  DEBUG_MQTT_SERIAL.println("starting connection");
   wifiManager.autoConnect("MQTTWifiManager");
-  Serial.println("connected...yeey :)");
+  DEBUG_MQTT_SERIAL.println("connected...yeey :)");
 
 
   mqttClient.setId("OutdoorHouse");
@@ -102,12 +115,12 @@ void setup() {
 
 
   if (!mqttClient.connect(broker, port)) {
-    Serial.print("MQTT connection failed! Error code = ");
-    Serial.println(mqttClient.connectError());
+    DEBUG_MQTT_SERIAL.print("MQTT connection failed! Error code = ");
+    DEBUG_MQTT_SERIAL.println(mqttClient.connectError());
     while (1)
       ;
   } else {
-    Serial.println("MQTT connected!");
+    DEBUG_MQTT_SERIAL.println("MQTT connected!");
   }
 }
 
@@ -117,11 +130,11 @@ void loop() {
     sensors_event_t event;
     dht.temperature().getEvent(&event);
     if (isnan(event.temperature)) {
-      Serial.println(F("Error reading temperature!"));
+      DEBUG_DHT_SERIAL.println(F("Error reading temperature!"));
     } else {
-      Serial.print(F("Temperature: "));
-      Serial.print(event.temperature);
-      Serial.println(F("°C"));
+      DEBUG_DHT_SERIAL.print(F("Temperature: "));
+      DEBUG_DHT_SERIAL.print(event.temperature);
+      DEBUG_DHT_SERIAL.println(F("°C"));
 
       tempSum += (event.temperature / float(RECORD_COUNT));
       tempCount++;
@@ -131,31 +144,39 @@ void loop() {
 
 
     if (isnan(event.relative_humidity)) {
-      Serial.println(F("Error reading humidity!"));
+      DEBUG_DHT_SERIAL.println(F("Error reading humidity!"));
 
     } else {
-      Serial.print(F("Humidity: "));
-      Serial.print(event.relative_humidity);
-      Serial.println(F("%"));
+      DEBUG_DHT_SERIAL.print(F("Humidity: "));
+      DEBUG_DHT_SERIAL.print(event.relative_humidity);
+      DEBUG_DHT_SERIAL.println(F("%"));
       humidSum += (event.relative_humidity / float(RECORD_COUNT));
       humidCount++;
     }
 
 
-    if(tempCount >= RECORD_COUNT){
+    if (tempCount >= RECORD_COUNT) {
       mqttClient.beginMessage(DHT_TEMP_TOPIC);
       mqttClient.print(tempSum);
       mqttClient.endMessage();
+      DEBUG_MQTT_SERIAL.print("Sending ");
+      DEBUG_MQTT_SERIAL.print(tempSum);
+      DEBUG_MQTT_SERIAL.print(" to ");
+      DEBUG_MQTT_SERIAL.println(DHT_TEMP_TOPIC);
       tempCount = 0;
-      tempSum = 0;      
+      tempSum = 0;
     }
-  
-    if(humidCount >= RECORD_COUNT){
+
+    if (humidCount >= RECORD_COUNT) {
       mqttClient.beginMessage(DHT_HUMID_TOPIC);
       mqttClient.print(humidSum);
       mqttClient.endMessage();
+      DEBUG_MQTT_SERIAL.print("Sending ");
+      DEBUG_MQTT_SERIAL.print(humidSum);
+      DEBUG_MQTT_SERIAL.print(" to ");
+      DEBUG_MQTT_SERIAL.println(DHT_HUMID_TOPIC);
       humidCount = 0;
-      humidSum = 0;      
+      humidSum = 0;
     }
 
     lastDHTCheck = millis();
