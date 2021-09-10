@@ -34,7 +34,7 @@
 #define DEBUG_DHT_SERIAL \
   if (DEBUG_DHT) Serial
 
-#define DEBUG_MQTT false
+#define DEBUG_MQTT true
 #define DEBUG_MQTT_SERIAL \
   if (DEBUG_MQTT) Serial
 
@@ -133,7 +133,7 @@ void setup() {
 
   // Temp and Humidity Sensor init
   dht.begin();
-  DEBUG_SERIAL.println(F("DHTxx Unified Sensor Example"));
+  DEBUG_DHT_SERIAL.println(F("DHTxx Unified Sensor Example"));
   // Print temperature sensor details.
   sensor_t sensor;
   dht.temperature().getSensor(&sensor);
@@ -209,6 +209,7 @@ void setup() {
   }
   mqttClient.subscribe(OUTDOOR_TEMP_TOPIC);
   mqttClient.subscribe(OUTDOOR_HUMID_TOPIC);
+  mqttClient.subscribe(DISPLAY_SELECTION_TOPIC);
 
 
 
@@ -329,6 +330,9 @@ void handleMQTT() {
     } else if (topic.equals(OUTDOOR_HUMID_TOPIC)) {
       outdoorHumidPrev = outdoorHumid;
       outdoorHumid = value.toFloat();
+    }else if (topic.equals(DISPLAY_SELECTION_TOPIC)){
+      menu.setSelectedMode(value.toInt());
+      modeChanged = true;
     }
   }
 }

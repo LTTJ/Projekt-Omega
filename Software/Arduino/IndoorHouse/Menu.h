@@ -18,6 +18,7 @@ public:
   void decrement(void);
   void show(Adafruit_SSD1306_WEMOS *display);
   uint8_t getSelectedMode(void);
+  void setSelectedMode(uint8_t mode);
   uint8_t getIndex(void);
   void select(void);
   bool hasChanged(void);

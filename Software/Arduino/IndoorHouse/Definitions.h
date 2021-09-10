@@ -45,7 +45,9 @@ const static int NTP_PACKET_SIZE = 48;
 static byte packetBuffer[NTP_PACKET_SIZE];
 
 // MQTT
-const char OUTDOOR_TEMP_TOPIC[] = "outdoor/dht/temp";
-const char OUTDOOR_HUMID_TOPIC[] = "outdoor/dht/humid";
+const char OUTDOOR_TEMP_TOPIC[] = "Projekt-Omega/outdoor/dht/temp";
+const char OUTDOOR_HUMID_TOPIC[] = "Projekt-Omega/outdoor/dht/humid";
+const char DISPLAY_SELECTION_TOPIC[] = "Projekt-Omega/indoor/displayMode";
+
 
 #endif
