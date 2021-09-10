@@ -23,6 +23,8 @@
 #include <DHT.h>
 #include <DHT_U.h>
 
+#include "Menu.h"
+
 // https://forum.arduino.cc/t/single-line-define-to-disable-code/636044/2
 #define DEBUG true
 #define DEBUG_SERIAL \
@@ -40,7 +42,7 @@
 Adafruit_SSD1306_WEMOS display1(OLED_RESET);
 Adafruit_SSD1306_WEMOS display2(OLED_RESET);
 
-uint8_t displayMode = 0;
+Menu menu;
 
 
 DHT_Unified dht(DHTPIN, DHTTYPE);
@@ -55,24 +57,31 @@ MqttClient mqttClient(client);
 
 Clock c;
 
-volatile bool switchFlag = false;
+// volatile bool switchFlag = false;
 
 ICACHE_RAM_ATTR void SWITCHHandler(void) {
-  switchFlag = true;
+  // switchFlag = true;
 }
 
 
-volatile int count = 0;
+// volatile int count = 0;
 volatile int lastCLK = 0;
 
 volatile bool countChanged = false;
 
+
+// data
 time_t prevDisplay = 0;  // when the digital clock was displayed
+
 float outdoorTempPrev = 0;
 float outdoorTemp = 0;
 float outdoorHumidPrev = 0;
 float outdoorHumid = 0;
 
+float indoorTemp = 0;
+float indoorTempPrev = 0;
+float indoorHumid = 0;
+float indoorHumidPrev = 0;
 
 //The interrupt handlers
 ICACHE_RAM_ATTR void ClockChanged(void) {
@@ -80,17 +89,20 @@ ICACHE_RAM_ATTR void ClockChanged(void) {
   int dtValue = digitalRead(DT);    //Read the DT pin level
   if (lastCLK != clkValue) {
     lastCLK = clkValue;
-    count += (clkValue != dtValue ? 1 : -1);  //CLK and inconsistent DT + 1, otherwise - 1
+    //  count += (clkValue != dtValue ? 1 : -1);  //CLK and inconsistent DT + 1, otherwise - 1
+    if (clkValue != dtValue) {
+      menu.increment();
+    } else {
+      menu.decrement();
+    }
   }
   countChanged = true;
 }
-
+volatile bool modeChanged = false;
 ICACHE_RAM_ATTR void SWChanged(void) {
-  displayMode++;
-  displayMode %= MODE_COUNT;
-  countChanged = true;
-  outdoorTempPrev = 256;
-  outdoorHumidPrev = 256;
+  uint8_t oldMode = menu.getSelectedMode();
+  menu.select();
+  modeChanged = (oldMode != menu.getSelectedMode());
 }
 
 
@@ -203,38 +215,96 @@ void setup() {
   Udp.begin(localPort);
   setSyncProvider(getNtpTime);
   setSyncInterval(300);
-
-  display2.clearDisplay();
-  display2.setCursor(0, 10);
-  display2.print(F("count: "));
-  display2.print(count);
-  display2.display();
 }
-
-
-
-/*     
-  Draw two eyes
-
-  display1.clearDisplay();
-  display1.drawCircle(32, 24, 23, WHITE);
-  display1.fillCircle(24, 21, 4, WHITE);
-
-  display1.drawLine(45,2 , 60, 24, WHITE);
-  display1.display();
-
-
-  display2.clearDisplay();
-  display2.drawCircle(32, 24, 23, WHITE);
-  display2.fillCircle(40, 20, 4, WHITE);
-
-  display1.drawLine(4,24 , 19, 2, WHITE);
-  display2.display();  
- */
-
 
 void loop() {
 
+  handleMQTT();
+
+  //if(menu.hasChanged()){
+  menu.show(&display1);
+  // }
+
+  switch (menu.getSelectedMode()) {
+    case INDOOR_DATA_MODE:
+      // get new data from the sensor periodically
+      getDHTData();
+
+      // display the indoor values
+      if (indoorTempPrev != indoorTemp || indoorHumidPrev != indoorHumid || modeChanged) {
+        display2.clearDisplay();
+        display2.setCursor(0, 5);
+        display2.print("Indoor");
+        display2.setCursor(0, 15);
+        display2.print(F("Tmp: "));
+        display2.print(indoorTemp);
+        // display2.println(F("°C"));
+
+        display2.setCursor(0, 25);
+        display2.print(F("Hum: "));
+        display2.print(indoorHumid);
+        display2.display();
+        // display2.println(F("%"));
+        indoorHumidPrev = indoorHumid;
+        indoorTempPrev = indoorTemp;
+
+        modeChanged = false;
+      }
+      break;
+    case OUTDOOR_DATA_MODE:
+      if (outdoorTempPrev != outdoorTemp || outdoorHumidPrev != outdoorHumid || modeChanged) {
+        display2.clearDisplay();
+        display2.setCursor(0, 5);
+        display2.print("Outdoor");
+        display2.setCursor(0, 15);
+        display2.print(F("Tmp: "));
+        display2.print(outdoorTemp);
+        // display2.println(F("°C"));
+
+        display2.setCursor(0, 25);
+
+        display2.print(F("Hum: "));
+        display2.print(outdoorHumid);
+        //  display2.println(F("%"));
+
+        display2.display();
+        outdoorTempPrev = outdoorTemp;
+        outdoorHumidPrev = outdoorHumid;
+        modeChanged = false;
+      }
+      break;
+    case DIGITAL_CLOCK:
+      if (timeStatus() != timeNotSet) {
+        if (now() != prevDisplay || modeChanged) {  //update the display only if time has changed
+          prevDisplay = now();
+          display2.clearDisplay();
+          c.displayDigital(&display2, hour(), minute(), second());
+          display2.display();
+          modeChanged = false;
+        }
+      }
+      break;
+    case ANALOG_CLOCK:
+    default:
+      if (timeStatus() != timeNotSet) {
+        if (now() != prevDisplay || modeChanged) {  //update the display only if time has changed
+          prevDisplay = now();
+          display2.clearDisplay();
+          c.displayAnalog(&display2, hour(), minute(), second());
+          display2.display();
+          modeChanged = false;
+        }
+      }
+  }
+
+
+
+  if (menu.hasChanged()) {
+    menu.show(&display1);
+  }
+}
+
+void handleMQTT() {
   int messageSize = mqttClient.parseMessage();
   if (messageSize) {
     // we received a message, print out the topic and contents
@@ -261,116 +331,39 @@ void loop() {
       outdoorHumid = value.toFloat();
     }
   }
+}
 
+void getDHTData() {
+  if (millis() - delayMS > lastDHTCheck) {
+    indoorTempPrev = indoorTemp;
+    sensors_event_t event;
+    dht.temperature().getEvent(&event);
 
-
-  switch (displayMode) {
-    case INDOOR_DATA_MODE:
-      if (millis() - delayMS > lastDHTCheck) {
-        display2.clearDisplay();
-        sensors_event_t event;
-        dht.temperature().getEvent(&event);
-        display2.setCursor(0, 5);
-        display2.print("Indoor");
-        display2.setCursor(0, 15);
-
-        if (isnan(event.temperature)) {
-          DEBUG_DHT_SERIAL.println(F("Error reading temperature!"));
-          display2.println(F("Tmp Err"));
-        } else {
-          DEBUG_DHT_SERIAL.print(F("Temperature: "));
-          DEBUG_DHT_SERIAL.print(event.temperature);
-          DEBUG_DHT_SERIAL.println(F("°C"));
-          display2.print(F("Tmp: "));
-          display2.print(event.temperature);
-          // display2.println(F("°C"));
-        }
-        // Get humidity event and print its value.
-        dht.humidity().getEvent(&event);
-        display2.setCursor(0, 25);
-
-        if (isnan(event.relative_humidity)) {
-          DEBUG_DHT_SERIAL.println(F("Error reading humidity!"));
-          display2.println(F("Hum Err"));
-        } else {
-          DEBUG_DHT_SERIAL.print(F("Humidity: "));
-          DEBUG_DHT_SERIAL.print(event.relative_humidity);
-          DEBUG_DHT_SERIAL.println(F("%"));
-          display2.print(F("Hum: "));
-          display2.print(event.relative_humidity);
-          //  display2.println(F("%"));
-        }
-        display2.display();
-        lastDHTCheck = millis();
-      }
-      break;
-    case OUTDOOR_DATA_MODE:
-      if (outdoorTempPrev != outdoorTemp) {
-
-        display2.clearDisplay();
-        display2.setCursor(0, 5);
-        display2.print("Outdoor");
-        display2.setCursor(0, 15);
-        display2.print(F("Tmp: "));
-        display2.print(outdoorTemp);
-        // display2.println(F("°C"));
-
-        display2.setCursor(0, 25);
-
-        display2.print(F("Hum: "));
-        display2.print(outdoorHumid);
-        //  display2.println(F("%"));
-
-        display2.display();
-        outdoorTempPrev = outdoorTemp;
-        outdoorHumidPrev = outdoorHumid;
-      }
-      break;
-    case COUNTER_MODE:
-      if (countChanged) {
-        display2.clearDisplay();
-        display2.setCursor(0, 5);
-        display2.print(F("Count: "));
-        display2.print(count);
-        display2.display();
-        countChanged = false;
-      }
-
-      break;
-    default:
-      break;
-  }
-
-
-  if (timeStatus() != timeNotSet) {
-    if (now() != prevDisplay) {  //update the display only if time has changed
-      prevDisplay = now();
-      display1.clearDisplay();
-      c.displayAnalog(&display1, hour(), minute(), second());
-      display1.display();
-    }
-  }
-  if (switchFlag) {
-
-    display1.clearDisplay();
-    c.displayAnalog(&display1, hour(), minute(), second());
-
-    if (digitalRead(SWITCHPIN)) {  // switch inverts display
-      display1.invertDisplay(1);
+    if (isnan(event.temperature)) {
+      DEBUG_DHT_SERIAL.println(F("Error reading temperature!"));
     } else {
-      display1.invertDisplay(0);
+      DEBUG_DHT_SERIAL.print(F("Temperature: "));
+      DEBUG_DHT_SERIAL.print(event.temperature);
+      DEBUG_DHT_SERIAL.println(F("°C"));
+      indoorTemp = event.temperature;
     }
-    display1.display();
 
-    switchFlag = false;
+    // Get humidity event and print its value.
+    dht.humidity().getEvent(&event);
+    if (isnan(event.relative_humidity)) {
+      DEBUG_DHT_SERIAL.println(F("Error reading humidity!"));
+    } else {
+      DEBUG_DHT_SERIAL.print(F("Humidity: "));
+      DEBUG_DHT_SERIAL.print(event.relative_humidity);
+      DEBUG_DHT_SERIAL.println(F("%"));
+      indoorHumid = event.relative_humidity;
+    }
+    lastDHTCheck = millis();
   }
 }
 
+
 // NTP STUFF
-
-const static int NTP_PACKET_SIZE = 48;
-static byte packetBuffer[NTP_PACKET_SIZE];
-
 time_t getNtpTime() {
   IPAddress ntpServerIP;  // NTP server's ip address
 
