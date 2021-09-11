@@ -16,11 +16,11 @@
 #define DEBUG_SERIAL \
   if (DEBUG) Serial
 
-#define DEBUG_DHT false
+#define DEBUG_DHT true
 #define DEBUG_DHT_SERIAL \
   if (DEBUG_DHT) Serial
 
-#define DEBUG_MQTT false
+#define DEBUG_MQTT true
 #define DEBUG_MQTT_SERIAL \
   if (DEBUG_MQTT) Serial
 
@@ -122,11 +122,10 @@ void setup() {
   } else {
     DEBUG_MQTT_SERIAL.println("MQTT connected!");
   }
-}
 
-void loop() {
-  mqttClient.poll();
-  if (millis() - lastDHTCheck >= delayMS) {
+
+  // gather data
+  for (int i = 0; i < RECORD_COUNT; i++) {
     sensors_event_t event;
     dht.temperature().getEvent(&event);
     if (isnan(event.temperature)) {
@@ -153,32 +152,33 @@ void loop() {
       humidSum += (event.relative_humidity / float(RECORD_COUNT));
       humidCount++;
     }
-
-
-    if (tempCount >= RECORD_COUNT) {
-      mqttClient.beginMessage(DHT_TEMP_TOPIC);
-      mqttClient.print(tempSum);
-      mqttClient.endMessage();
-      DEBUG_MQTT_SERIAL.print("Sending ");
-      DEBUG_MQTT_SERIAL.print(tempSum);
-      DEBUG_MQTT_SERIAL.print(" to ");
-      DEBUG_MQTT_SERIAL.println(DHT_TEMP_TOPIC);
-      tempCount = 0;
-      tempSum = 0;
-    }
-
-    if (humidCount >= RECORD_COUNT) {
-      mqttClient.beginMessage(DHT_HUMID_TOPIC);
-      mqttClient.print(humidSum);
-      mqttClient.endMessage();
-      DEBUG_MQTT_SERIAL.print("Sending ");
-      DEBUG_MQTT_SERIAL.print(humidSum);
-      DEBUG_MQTT_SERIAL.print(" to ");
-      DEBUG_MQTT_SERIAL.println(DHT_HUMID_TOPIC);
-      humidCount = 0;
-      humidSum = 0;
-    }
-
-    lastDHTCheck = millis();
+    delay(delayMS);
   }
+
+  //send temp
+  mqttClient.beginMessage(DHT_TEMP_TOPIC);
+  mqttClient.print(tempSum);
+  mqttClient.endMessage();
+  DEBUG_MQTT_SERIAL.print("Sending ");
+  DEBUG_MQTT_SERIAL.print(tempSum);
+  DEBUG_MQTT_SERIAL.print(" to ");
+  DEBUG_MQTT_SERIAL.println(DHT_TEMP_TOPIC);
+
+  // send humid
+  mqttClient.beginMessage(DHT_HUMID_TOPIC);
+  mqttClient.print(humidSum);
+  mqttClient.endMessage();
+  DEBUG_MQTT_SERIAL.print("Sending ");
+  DEBUG_MQTT_SERIAL.print(humidSum);
+  DEBUG_MQTT_SERIAL.print(" to ");
+  DEBUG_MQTT_SERIAL.println(DHT_HUMID_TOPIC);
+
+  // the messages need some time to be send therefore we delay for one second.
+  delay(1000);
+
+  ESP.deepSleep(60e6);
+}
+
+void loop() {
+  //mqttClient.poll();
 }

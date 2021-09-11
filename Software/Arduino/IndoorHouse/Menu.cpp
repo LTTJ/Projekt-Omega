@@ -1,7 +1,6 @@
 #include "Menu.h"
 
 Menu::Menu() {
-
 }
 
 void Menu::increment(void) {
@@ -51,10 +50,9 @@ void Menu::select(void) {
   this->selectedMode = this->index;
 }
 
-  void Menu::setSelectedMode(uint8_t mode){
-    mode %= MODE_COUNT;
-    this->index = mode;
-    this->selectedMode = mode;
-    this->menuChanged = true;
-  }
-
+void Menu::setSelectedMode(uint8_t mode) {
+  mode %= MODE_COUNT;
+  this->index = mode;
+  this->selectedMode = mode;
+  this->menuChanged = true;
+}

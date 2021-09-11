@@ -57,10 +57,16 @@ MqttClient mqttClient(client);
 
 Clock c;
 
-// volatile bool switchFlag = false;
+volatile bool lightsOn = true;
+volatile bool switchFlag = false;
+
+volatile bool modeChanged = false;
+volatile bool requestData = false;
 
 ICACHE_RAM_ATTR void SWITCHHandler(void) {
-  // switchFlag = true;
+  switchFlag = true;
+  modeChanged = true;
+  lightsOn = !lightsOn;
 }
 
 
@@ -83,6 +89,9 @@ float indoorTempPrev = 0;
 float indoorHumid = 0;
 float indoorHumidPrev = 0;
 
+String SpaceXName;
+String SpaceXLaunchDate;
+
 //The interrupt handlers
 ICACHE_RAM_ATTR void ClockChanged(void) {
   int clkValue = digitalRead(CLK);  //Read the CLK pin level
@@ -98,11 +107,12 @@ ICACHE_RAM_ATTR void ClockChanged(void) {
   }
   countChanged = true;
 }
-volatile bool modeChanged = false;
+
 ICACHE_RAM_ATTR void SWChanged(void) {
   uint8_t oldMode = menu.getSelectedMode();
   menu.select();
   modeChanged = (oldMode != menu.getSelectedMode());
+  requestData = true;
 }
 
 
@@ -211,6 +221,8 @@ void setup() {
   mqttClient.subscribe(OUTDOOR_HUMID_TOPIC);
   mqttClient.subscribe(DISPLAY_SELECTION_TOPIC);
 
+  mqttClient.subscribe(API_SPACEX_NAME);
+  mqttClient.subscribe(API_SPACEX_LAUNCHDATE);
 
 
   Udp.begin(localPort);
@@ -219,8 +231,34 @@ void setup() {
 }
 
 void loop() {
+  if(requestData){
+    switch(menu.getSelectedMode()){
+      case SPACEX:
+        mqttClient.beginMessage(API_SPACEX);
+        mqttClient.print(1);
+        mqttClient.endMessage();
+        break;
+      default:
+      break;
+    }
+    requestData = false;
+  }
 
   handleMQTT();
+
+
+  if (!lightsOn) {
+    DEBUG_SERIAL.println("lights off");
+    if (switchFlag) {
+      display1.clearDisplay();
+      display1.display();
+      display2.clearDisplay();
+      display2.display();
+      DEBUG_SERIAL.println("displays off");
+      switchFlag = false;
+    }
+    return;
+  }
 
   //if(menu.hasChanged()){
   menu.show(&display1);
@@ -285,6 +323,28 @@ void loop() {
         }
       }
       break;
+    case MIXED_CLOCK:
+      if (timeStatus() != timeNotSet) {
+        if (now() != prevDisplay || modeChanged) {  //update the display only if time has changed
+          prevDisplay = now();
+          display2.clearDisplay();
+          c.displayMixed(&display2, hour(), minute(), second());
+          display2.display();
+          modeChanged = false;
+        }
+      }
+      break;
+    case SPACEX:
+      if(modeChanged){
+        display2.clearDisplay();
+        display2.setCursor(0, 12);
+        display2.print(SpaceXName);
+        display2.setCursor(0, 24);
+        display2.print(SpaceXLaunchDate);
+        display2.display();
+        modeChanged = false;
+      }
+      break;
     case ANALOG_CLOCK:
     default:
       if (timeStatus() != timeNotSet) {
@@ -297,6 +357,7 @@ void loop() {
         }
       }
   }
+  // switchFlag = false;
 
 
 
@@ -330,8 +391,18 @@ void handleMQTT() {
     } else if (topic.equals(OUTDOOR_HUMID_TOPIC)) {
       outdoorHumidPrev = outdoorHumid;
       outdoorHumid = value.toFloat();
-    }else if (topic.equals(DISPLAY_SELECTION_TOPIC)){
+    } else if (topic.equals(DISPLAY_SELECTION_TOPIC)) {
       menu.setSelectedMode(value.toInt());
+      modeChanged = true;
+    }else if(topic.equals(API_SPACEX_NAME)){
+      DEBUG_SERIAL.print("Name: ");
+      DEBUG_SERIAL.println(value);
+      SpaceXName = value;
+      modeChanged = true;
+    }else if(topic.equals(API_SPACEX_LAUNCHDATE)){
+      DEBUG_SERIAL.print("Date: ");
+      DEBUG_SERIAL.println(value);
+      SpaceXLaunchDate = value;
       modeChanged = true;
     }
   }

@@ -2,6 +2,7 @@
 #define MY_CLOCK_H
 
 #include <Arduino.h>
+#include "Definitions.h"
 #include <Adafruit_SSD1306_WEMOS.h>
 
 
@@ -18,5 +19,6 @@ public:
   void displayAnalog(Adafruit_SSD1306_WEMOS *display, uint8_t hours, uint8_t minutes, uint8_t seconds);
   void displayAnalog(Adafruit_SSD1306_WEMOS *display, uint8_t hours, uint8_t minutes);
   void displayDigital(Adafruit_SSD1306_WEMOS *display, uint8_t hours, uint8_t minutes, uint8_t seconds);
+  void displayMixed(Adafruit_SSD1306_WEMOS *display, uint8_t hours, uint8_t minutes, uint8_t seconds);
 };
 #endif

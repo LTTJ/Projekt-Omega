@@ -43,3 +43,25 @@ void Clock::displayDigital(Adafruit_SSD1306_WEMOS *display, uint8_t hours, uint8
   }
   display->println(seconds);
 }
+
+void Clock::displayMixed(Adafruit_SSD1306_WEMOS *display, uint8_t hours, uint8_t minutes, uint8_t seconds) {
+  hours %= 24;
+  minutes %= 60;
+  seconds %= 60;
+  display->setCursor(DISPLAY_WIDTH / 2 - 12, DISPLAY_HEIGHT / 2);
+  display->setTextSize(1);
+  if (hours < 10) {
+    display->print(0);
+  }
+  display->print(hours);
+  display->print(F(":"));
+  if (minutes < 10) {
+    display->print(0);
+  }
+  display->print(minutes);
+
+  // draw Points for seconds
+  for (uint8_t i = 0; i < seconds; i++) {
+    display->fillCircle(cos(toRad(i * 6 - 90)) * this->r + this->x, sin(toRad(i * 6 - 90)) * this->r + this->y, 1, WHITE);  // seconds
+  }
+}
