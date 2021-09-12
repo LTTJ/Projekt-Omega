@@ -145,6 +145,9 @@ void setup() {
   display2.setTextColor(WHITE);
   display2.clearDisplay();
   display2.setTextWrap(false);
+  display2.setCursor(0, 0);
+  display2.print("DHT init");
+  display2.display();
 
   // Temp and Humidity Sensor init
   dht.begin();
@@ -192,6 +195,11 @@ void setup() {
   // Set delay between sensor readings based on sensor details.
   delayMS = sensor.min_delay / 1000;
 
+  //display2.clearDisplay();
+  display2.setCursor(0, 12);
+  display2.print("DHT done");
+  display2.display();
+
   WiFiManager wifiManager;
   wifiManager.setWiFiAutoReconnect(true);
   DEBUG_SERIAL.println("starting connection");
@@ -225,6 +233,7 @@ void setup() {
   mqttClient.subscribe(OUTDOOR_TEMP_TOPIC);
   mqttClient.subscribe(OUTDOOR_HUMID_TOPIC);
   mqttClient.subscribe(DISPLAY_SELECTION_TOPIC);
+  mqttClient.subscribe(DISPLAY_ACTIVE_TOPIC);
 
   mqttClient.subscribe(API_SPACEX_NAME);
   mqttClient.subscribe(API_SPACEX_LAUNCHDATE);
@@ -242,6 +251,7 @@ void loop() {
         mqttClient.beginMessage(API_SPACEX);
         mqttClient.print(1);
         mqttClient.endMessage();
+        DEBUG_SERIAL.println("sending SpaceX request");
         break;
       default:
         break;
@@ -398,6 +408,11 @@ void handleMQTT() {
     } else if (topic.equals(DISPLAY_SELECTION_TOPIC)) {
       menu.setSelectedMode(value.toInt());
       modeChanged = true;
+      requestData = true;
+    } else if (topic.equals(DISPLAY_ACTIVE_TOPIC)) {
+      switchFlag = true;
+      modeChanged = true;
+      lightsOn = value.toInt();
     } else if (topic.equals(API_SPACEX_NAME)) {
       DEBUG_SERIAL.print("Name: ");
       DEBUG_SERIAL.println(value);

@@ -49,10 +49,11 @@ static byte packetBuffer[NTP_PACKET_SIZE];
 // MQTT
 const char OUTDOOR_TEMP_TOPIC[] = "Projekt-Omega/outdoor/dht/temp";
 const char OUTDOOR_HUMID_TOPIC[] = "Projekt-Omega/outdoor/dht/humid";
-const char DISPLAY_SELECTION_TOPIC[] = "Projekt-Omega/indoor/displayMode";
+const char DISPLAY_SELECTION_TOPIC[] = "Projekt-Omega/indoor/display/mode";
+const char DISPLAY_ACTIVE_TOPIC[] = "Projekt-Omega/indoor/display/active";
 
-const char API_SPACEX[] = "api/spaceX";
-const char API_SPACEX_NAME[] = "api/spaceX/name";
-const char API_SPACEX_LAUNCHDATE[] = "api/spaceX/launchDate";
+const char API_SPACEX[] = "Projekt-Omega/api/spaceX";
+const char API_SPACEX_NAME[] = "Projekt-Omega/api/spaceX/name";
+const char API_SPACEX_LAUNCHDATE[] = "Projekt-Omega/api/spaceX/launchDate";
 
 #endif
