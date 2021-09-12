@@ -1,3 +1,8 @@
+/*
+By Jonas Pohl
+~ September 2021
+*/
+
 #include "Menu.h"
 
 Menu::Menu() {

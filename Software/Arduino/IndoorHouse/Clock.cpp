@@ -1,3 +1,8 @@
+/*
+By Jonas Pohl
+~ September 2021
+*/
+
 #include "Clock.h"
 
 double Clock::toRad(double deg) {

@@ -1,3 +1,8 @@
+/*
+By Jonas Pohl
+~ September 2021
+*/
+
 #include "Scroll.h"
 
 uint16_t Scroll::calcLength(String s, uint8_t textSize) {

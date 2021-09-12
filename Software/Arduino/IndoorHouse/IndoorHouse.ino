@@ -1,3 +1,9 @@
+/*
+By LTTJ
+~ September 2021
+*/
+
+// Einbinden der benötigten Bibliotheken
 #include "secrets.h"
 #include "Definitions.h"
 // OLED
@@ -27,6 +33,8 @@
 #include "Scroll.h"
 
 // https://forum.arduino.cc/t/single-line-define-to-disable-code/636044/2
+// Aktiviere und deaktiviere Spezielle Serialausgaben über eine einfache Flag.
+// Dies macht es wesentlich einfacher mit dem Serial Monitor große Programme zu debuggen.
 #define DEBUG true
 #define DEBUG_SERIAL \
   if (DEBUG) Serial
@@ -65,6 +73,7 @@ volatile bool switchFlag = false;
 volatile bool modeChanged = false;
 volatile bool requestData = false;
 
+// ISR für den Interrupt des Schalters an D5
 ICACHE_RAM_ATTR void SWITCHHandler(void) {
   switchFlag = true;
   modeChanged = true;
@@ -72,13 +81,13 @@ ICACHE_RAM_ATTR void SWITCHHandler(void) {
 }
 
 
+// Diese Variablen werden gebraucht, um festzustellen, ob und wie sich der Encoder gedreht hat
 // volatile int count = 0;
 volatile int lastCLK = 0;
-
 volatile bool countChanged = false;
 
 
-// data
+// Buffer für Daten, die sonst über MQTT wieder erfragt werden müssten
 time_t prevDisplay = 0;  // when the digital clock was displayed
 
 float outdoorTempPrev = 0;
@@ -94,7 +103,8 @@ float indoorHumidPrev = 0;
 String SpaceXName;
 String SpaceXLaunchDate;
 
-//The interrupt handlers
+// interrupt handlers
+// drehen des Encoders
 ICACHE_RAM_ATTR void ClockChanged(void) {
   int clkValue = digitalRead(CLK);  //Read the CLK pin level
   int dtValue = digitalRead(DT);    //Read the DT pin level
@@ -110,6 +120,7 @@ ICACHE_RAM_ATTR void ClockChanged(void) {
   countChanged = true;
 }
 
+// klicken des Encoders
 ICACHE_RAM_ATTR void SWChanged(void) {
   uint8_t oldMode = menu.getSelectedMode();
   menu.select();
@@ -200,6 +211,7 @@ void setup() {
   display2.print("DHT done");
   display2.display();
 
+  // starting WiFi setup
   WiFiManager wifiManager;
   wifiManager.setWiFiAutoReconnect(true);
   DEBUG_SERIAL.println("starting connection");
@@ -212,6 +224,7 @@ void setup() {
   display1.println("connected!");
   display1.display();
 
+  // MQTT setup
   mqttClient.setId("IndoorHouse");
   mqttClient.setUsernamePassword(username, password);
 
@@ -238,13 +251,15 @@ void setup() {
   mqttClient.subscribe(API_SPACEX_NAME);
   mqttClient.subscribe(API_SPACEX_LAUNCHDATE);
 
-
+  // ermittele Zeit mittels UDP
   Udp.begin(localPort);
   setSyncProvider(getNtpTime);
   setSyncInterval(300);
 }
 
 void loop() {
+  // Falls Daten von Node-RED erfragt werden müssen, wird die requestData Flag gesetzt, sodass an dieser Stelle dann die Daten erbittet werden können.
+  // Dies geschieht, indem eine entsprechende Nachricht an Node-RED geschickt wird, welche das Versenden der Daten triggert.
   if (requestData) {
     switch (menu.getSelectedMode()) {
       case SPACEX:
@@ -259,9 +274,11 @@ void loop() {
     requestData = false;
   }
 
+  // Falls MQTT Nachrichten kommen, verarbeite sie entsprechend
   handleMQTT();
 
 
+  // Wenn wir kein Licht an haben, dann werden hier die Displays deaktiviert und das Programm braucht nicht weiter machen, da nichts mehr angezeigt werden soll -> return
   if (!lightsOn) {
     DEBUG_SERIAL.println("lights off");
     if (switchFlag) {
@@ -275,10 +292,8 @@ void loop() {
     return;
   }
 
-  //if(menu.hasChanged()){
-  menu.show(&display1);
-  // }
 
+  // entsprechend des ausgewählten Mode im Menu werden bestimmte Anzeigen gerendert.
   switch (menu.getSelectedMode()) {
     case INDOOR_DATA_MODE:
       // get new data from the sensor periodically
@@ -374,7 +389,7 @@ void loop() {
   // switchFlag = false;
 
 
-
+  // Zeichne das Menu
   if (menu.hasChanged()) {
     menu.show(&display1);
   }
