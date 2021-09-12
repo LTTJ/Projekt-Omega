@@ -35,7 +35,7 @@ const uint8_t SPACEX = 5;
 const uint8_t MODE_COUNT = 6;
 // Auflistung der Strings, welche im Menü angezeigt werden.
 // Reihenfolge muss mit den Mode-Values übereinstimmen!
-const static char *MODES[MODE_COUNT] = { "Indoor", "Outdoor", "Analog", "Digital", "Mixed", "SpaceX"};
+const static char *MODES[MODE_COUNT] = { "Indoor", "Outdoor", "Analog", "Digital", "Mixed", "SpaceX" };
 
 // UDP TIME
 const static char ntpServerName[] = "de.pool.ntp.org";

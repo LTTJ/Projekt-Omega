@@ -24,6 +24,7 @@
 #include <DHT_U.h>
 
 #include "Menu.h"
+#include "Scroll.h"
 
 // https://forum.arduino.cc/t/single-line-define-to-disable-code/636044/2
 #define DEBUG true
@@ -43,6 +44,7 @@ Adafruit_SSD1306_WEMOS display1(OLED_RESET);
 Adafruit_SSD1306_WEMOS display2(OLED_RESET);
 
 Menu menu;
+Scroll scroll;
 
 
 DHT_Unified dht(DHTPIN, DHTTYPE);
@@ -138,8 +140,11 @@ void setup() {
 
   display1.setTextColor(WHITE);
   display1.clearDisplay();
+  display1.setTextWrap(false);
+
   display2.setTextColor(WHITE);
   display2.clearDisplay();
+  display2.setTextWrap(false);
 
   // Temp and Humidity Sensor init
   dht.begin();
@@ -231,15 +236,15 @@ void setup() {
 }
 
 void loop() {
-  if(requestData){
-    switch(menu.getSelectedMode()){
+  if (requestData) {
+    switch (menu.getSelectedMode()) {
       case SPACEX:
         mqttClient.beginMessage(API_SPACEX);
         mqttClient.print(1);
         mqttClient.endMessage();
         break;
       default:
-      break;
+        break;
     }
     requestData = false;
   }
@@ -335,15 +340,14 @@ void loop() {
       }
       break;
     case SPACEX:
-      if(modeChanged){
-        display2.clearDisplay();
-        display2.setCursor(0, 12);
-        display2.print(SpaceXName);
-        display2.setCursor(0, 24);
-        display2.print(SpaceXLaunchDate);
-        display2.display();
+      if (modeChanged) {
+        scroll.clear(&display2);
+        scroll.setRow(0, SpaceXName);
+        scroll.setRow(1, SpaceXLaunchDate);
         modeChanged = false;
       }
+      scroll.update();
+      scroll.show(&display2);
       break;
     case ANALOG_CLOCK:
     default:
@@ -394,12 +398,12 @@ void handleMQTT() {
     } else if (topic.equals(DISPLAY_SELECTION_TOPIC)) {
       menu.setSelectedMode(value.toInt());
       modeChanged = true;
-    }else if(topic.equals(API_SPACEX_NAME)){
+    } else if (topic.equals(API_SPACEX_NAME)) {
       DEBUG_SERIAL.print("Name: ");
       DEBUG_SERIAL.println(value);
       SpaceXName = value;
       modeChanged = true;
-    }else if(topic.equals(API_SPACEX_LAUNCHDATE)){
+    } else if (topic.equals(API_SPACEX_LAUNCHDATE)) {
       DEBUG_SERIAL.print("Date: ");
       DEBUG_SERIAL.println(value);
       SpaceXLaunchDate = value;
