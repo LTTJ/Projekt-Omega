@@ -98,7 +98,7 @@ void setup() {
   WiFiManager wifiManager;
   wifiManager.setWiFiAutoReconnect(true);
   DEBUG_MQTT_SERIAL.println("starting connection");
-  wifiManager.autoConnect("MQTTWifiManager");
+  wifiManager.autoConnect("OutdoorHouse");
   DEBUG_MQTT_SERIAL.println("connected...yeey :)");
 
 
