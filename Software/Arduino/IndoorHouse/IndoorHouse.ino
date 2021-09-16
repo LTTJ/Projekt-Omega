@@ -77,7 +77,7 @@ volatile bool requestData = false;
 ICACHE_RAM_ATTR void SWITCHHandler(void) {
   switchFlag = true;
   modeChanged = true;
-  menu.
+  menu.setChanged(true);
   lightsOn = !lightsOn;
 }
 
