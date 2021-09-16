@@ -54,7 +54,7 @@ Sind die Displays hingegen aktiviert und sollen Daten anzeigen, wird auf einem D
 Das Outdoor-Haus erlaubt keine Interaktion und ist so implementiert, dass es von überall Daten aufnehmen und an das Indoor-Haus senden kann. Dazu verbindet sich der Mikrocontroller zuerst mit dem WiFi und baut eine Verbindung zum MQTT-Broker auf. Daraufhin folgt eine Aufnahmereihe von 10 Aufnahmen, aus welchen ein Mittelwert errechnet wird. Ist dies geschehen, werden die Daten mittels MQTT an alle abonnierenden MQTT-Teilnehmer gesendet (Indoor-Haus). Abschließend geht der Controller für eine Minute in den Deep Sleep Modus. Um aus diesem Modus wieder "erwachen" zu können, müssen der D0 und der RST Pin miteinander verbunden sein. Die Nutzung des Deep Sleep Modus hat zwei verschiedene Gründe:
 
 * Der Wemos d1 Mini produziert im Dauerbetrieb eine enorme Menge an Wärme, welche unweigerlich die Aufnahme der Temperaturwerte verfälscht. In einigen Tests wurden Temperaturabweichungen bis zu 10 °C festgestellt.
-* Da der Wemos eine Minute lang nahezu ausgeschaltet wird, wird dabei keine Energie verbraucht und der Akku muss seltener geladen werden.
+* Da der Wemos eine Minute lang nahezu ausgeschaltet ist, wird dabei keine Energie verbraucht und der Akku muss seltener geladen werden.
 
 
 ## Bibliotheken
