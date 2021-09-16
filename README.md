@@ -57,6 +57,22 @@ Das Outdoor Haus erlaubt keine Interaktion und ist so implementiert, dass es von
 * Da der Wemos eine Minuten lang quasi ausgeschaltet ist, wird dabei keine Energie verbraucht und der Akkubetrieb kann so über einen längeren Zeitraum ermöglicht werden.
 
 
+## Bibliotheken
+Um das Projekt realisieren zu können wurden diverse Bibliotheken verwendet, welche alle im Library Manger der Arduino IDE heruntergeladen werden können:
+
+
+- "Adafruit GFX Library" by Adafruit, v1.10.10
+- "Adafruit SSD1306 Wemos Mini OLED" by Adafruit + mcauser, v1.1.2
+- "ArduinoMqttClient" by Arduino, v0.1.5
+- "WiFiManager" by tzapu,tablatronix, v2.0.3-alpha
+- "DHT sensor library" by Adafruit, v1.3.9
+- "Time" by Michael Margolis, v1.6.1 (https://github.com/PaulStoffregen/Time)
+
+
+
+<p>Da die Bibliothek "Adafruit SSD1306 Wemos Mini OLED" die selben Klassennamen hat, wie die Bibliothek "Adafruit SSD1306" by Adafruit, besteht die Gefahr, dass der Compiler nicht weiß, welche Klasse verwendet werden soll. Die ist insbesondere Problematisch, wenn man beide Bibliotheken installiert hat. Um dieses Problem zu umgehen, wurden die Klassen in der Bibliothek "Adafruit SSD1306 Wemos Mini OLED" mittels find and replace so bearbeitet, dass alle Klassennamen um den Suffix "_WEMOS" ergänzt wurden. Auf diese Weise können beide Bibliotheken simultan verwendet werden.
+
+
 # APP
 
 Die Implementierung der App erfolgte online mit Hilfe der Website MIT App Inventor. Durch die Erweiterung eines Beispielprgramms, welches bereits MQTT implementiert hatte, konnte relativ simpel eine einfache App gestaltet und mit MQTT-Funktionalität ausgestattet werden.
