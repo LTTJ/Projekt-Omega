@@ -22,6 +22,7 @@ public:
   uint8_t getIndex(void);
   void select(void);
   bool hasChanged(void);
+  void setChanged(bool flag);
 };
 
 #endif
