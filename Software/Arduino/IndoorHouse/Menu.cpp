@@ -34,6 +34,9 @@ void Menu::show(Adafruit_SSD1306_WEMOS *display) {
       display->setTextColor(WHITE);
     }
     display->print(MODES[(this->index + i) % MODE_COUNT]);
+    if((this->index + i) % MODE_COUNT == this->selectedMode){
+      display->print("*");
+    }
   }
   display->display();
   this->menuChanged = false;
@@ -53,6 +56,7 @@ bool Menu::hasChanged(void) {
 
 void Menu::select(void) {
   this->selectedMode = this->index;
+  this->menuChanged = true;
 }
 
 void Menu::setSelectedMode(uint8_t mode) {
